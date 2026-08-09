@@ -26,6 +26,7 @@ from typing import Awaitable, Callable
 
 from app.models import ExtractedField, EvidenceResult
 from app.verification import bright_data_client as bd
+from app.verification import weather_client as weather
 
 logger = logging.getLogger("adjudicate")
 
@@ -81,7 +82,9 @@ async def dispatch_lookups(fields: list[ExtractedField]) -> list[EvidenceResult]
     if date and location and any(w in cause for w in WEATHER_TRIGGER_CAUSES):
         planned.append(
             _guarded(
-                partial(bd.check_weather, date=date, location=location, claimed_cause=cause),
+                # Real implementation (Open-Meteo). The other three lookups
+                # are still Bright Data stubs — see weather_client's docstring.
+                partial(weather.check_weather, date=date, location=location, claimed_cause=cause),
                 field_name="date",
                 query_type="weather",
                 claimed_value=f"{cause} on {date} at {location}",
