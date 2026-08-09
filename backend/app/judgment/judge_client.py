@@ -109,6 +109,11 @@ async def judge(
         stage="judge",
     )
 
+    # Shown verbatim in the dossier's Evidence column. When nothing was
+    # actually gathered, the model tends to echo the claim back — which
+    # renders as the same sentence twice and reads like a bug.
+    NO_EVIDENCE = "No evidence gathered — lookup not yet implemented"
+
     findings: list[ContradictionFinding] = []
     for item in parsed.get("findings", []):
         if not isinstance(item, dict):
@@ -117,12 +122,17 @@ async def judge(
         if pair is None:
             logger.warning("judge invented a field we never checked: %r", item.get("field_name"))
             continue
+        stubbed = "[STUB]" in (pair["evidence_summary"] or "")
+        evidence_value = str(item.get("evidence_value") or pair["evidence_summary"])
+        if stubbed or evidence_value.strip() == pair["claimed_value"].strip():
+            evidence_value = NO_EVIDENCE
+
         findings.append(
             ContradictionFinding(
                 claim_id=claim_id,
                 field_name=pair["field_name"],
                 claimed_value=pair["claimed_value"],     # ours, not the model's paraphrase
-                evidence_value=str(item.get("evidence_value") or pair["evidence_summary"]),
+                evidence_value=evidence_value,
                 verdict=_parse_verdict(item.get("verdict")),
                 detail=item.get("detail"),
                 source_url=pair["source_url"],
