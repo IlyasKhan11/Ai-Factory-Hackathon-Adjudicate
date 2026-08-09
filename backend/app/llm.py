@@ -70,4 +70,23 @@ async def chat_json(
         logger.warning("%s: response had no choices: %.200s", stage, data)
         return {}
 
-    return parse_json_object(choices[0].get("message", {}).get("content", ""))
+    choice = choices[0]
+    content = (choice.get("message") or {}).get("content")
+
+    if not content:
+        # Almost always a reasoning model: the whole max_tokens budget went to
+        # hidden reasoning, so nothing was left to answer with. Silent empty
+        # output is the worst failure mode here, so name it explicitly.
+        reasoning = (usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
+        if choice.get("finish_reason") == "length" and reasoning:
+            logger.error(
+                "%s: model %r spent all %s tokens on reasoning and returned no content. "
+                "Use a NON-reasoning model (e.g. deepseek/deepseek-chat) or raise max_tokens.",
+                stage, model, reasoning,
+            )
+        else:
+            logger.warning("%s: model %r returned empty content (finish_reason=%s)",
+                           stage, model, choice.get("finish_reason"))
+        return {}
+
+    return parse_json_object(content)

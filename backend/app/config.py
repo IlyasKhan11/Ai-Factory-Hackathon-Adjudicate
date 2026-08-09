@@ -20,7 +20,14 @@ class Settings:
     # dependency anywhere in the codebase.
     aiml_api_key: str = os.getenv("AIML_API_KEY", "")
     aiml_api_base: str = os.getenv("AIML_API_BASE", "https://api.aimlapi.com/v1")
-    aiml_kimi_model: str = os.getenv("AIML_KIMI_MODEL", "kimi-k2.6")
+    # Extraction model. MUST be a non-reasoning model: reasoning tokens count
+    # against max_tokens, so a thinking model spends the whole budget on
+    # hidden reasoning, returns content=None with finish_reason="length", and
+    # extraction silently yields zero fields. Measured on this key:
+    # kimi-k2.6 -> 90s+ timeout, no output. deepseek/deepseek-chat -> 2.9s,
+    # clean JSON. DeepSeek-V3 is also open-weight, which keeps the brief's
+    # compliance argument intact for the judge stage.
+    aiml_kimi_model: str = os.getenv("AIML_KIMI_MODEL", "deepseek/deepseek-chat")
     # Judgment defaults to the same model as extraction: it's the one model id
     # you'll have already confirmed works against your key. Point it at any
     # open-weight model in the AI/ML catalog to strengthen the compliance
