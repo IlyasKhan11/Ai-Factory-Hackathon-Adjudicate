@@ -62,6 +62,18 @@ class ContradictionFinding(BaseModel):
     confidence: float
 
 
+class AnalyzeRequest(BaseModel):
+    """
+    Body for POST /claims/{claim_id}/analyze — the one-shot path.
+
+    Lets a frontend run the whole pipeline (understand -> go look -> judge ->
+    score) from a finished transcript, without speaking the live WebSocket
+    protocol. The Live Intake screen simulates the call client-side, then
+    posts the completed transcript here when the adjuster ends it.
+    """
+    transcript: str
+
+
 class ClaimDossier(BaseModel):
     claim_id: str
     risk_score: int                     # 0-100

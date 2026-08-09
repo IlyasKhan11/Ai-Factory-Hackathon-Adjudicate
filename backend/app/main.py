@@ -33,7 +33,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.models import TranscriptTurn, ExtractedField
+from app.models import AnalyzeRequest, TranscriptTurn, ExtractedField
 from app.speechmatics_client import LiveTranscriber
 from app.kimi_client import extract_fields
 from app.verification.dispatcher import dispatch_lookups
@@ -94,6 +94,61 @@ def get_dossier(claim_id: str):
         "risk_tier": verdict_row.get("risk_tier"),
         "summary": verdict_row.get("summary"),
         "findings": db.get_contradictions(claim_id),
+    }
+
+
+@app.post("/claims/{claim_id}/analyze")
+async def analyze_claim(claim_id: str, body: AnalyzeRequest):
+    """
+    Run the full pipeline over a finished transcript and return the dossier.
+
+    The one-shot alternative to the live WebSocket: same stages 2-5, same
+    output, one HTTP call. This is what a frontend should use unless it is
+    genuinely streaming microphone audio — it removes binary framing, audio
+    format negotiation and socket lifecycle from the integration entirely.
+
+    Costs exactly one extraction call plus one judgment call per request, so
+    it is also the cheapest way to exercise the whole pipeline while
+    building.
+    """
+    transcript = body.transcript.strip()
+    if not transcript:
+        raise HTTPException(status_code=400, detail="transcript is empty")
+
+    session_id = await _db(db.start_intake_session, claim_id) or f"oneshot-{uuid.uuid4()}"
+    await _db(db.log_audit_event, claim_id, "analyze_started", {"session_id": session_id})
+
+    try:
+        fields = await extract_fields(session_id, transcript)
+    except Exception as exc:
+        logger.exception("extraction failed for claim %s", claim_id)
+        raise HTTPException(status_code=502, detail=f"field extraction failed: {exc}")
+
+    for f in fields:
+        await _db(db.save_extracted_field, f)
+
+    warning = None
+    try:
+        evidence = await dispatch_lookups(fields)
+        findings = await judge(claim_id, fields, evidence)
+    except Exception as exc:
+        # Partial result beats no result: the extracted fields are still
+        # worth showing even if verification couldn't run.
+        logger.exception("verification/judgment failed for claim %s", claim_id)
+        findings, warning = [], f"verification/judgment failed: {exc}"
+
+    dossier = score_dossier(claim_id, findings)
+
+    for finding in findings:
+        await _db(db.save_contradiction, finding)
+    await _db(db.save_dossier, dossier)
+    await _db(db.end_intake_session, session_id)
+    await _db(db.log_audit_event, claim_id, "dossier_computed", {"risk_score": dossier.risk_score})
+
+    return {
+        **dossier.model_dump(mode="json"),
+        "fields": [f.model_dump(mode="json") for f in fields],
+        "warning": warning,
     }
 
 
