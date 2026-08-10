@@ -44,7 +44,14 @@ ARCHIVE_LAG_DAYS = 6
 TRACE_PRECIPITATION_MM = 1.0
 
 # Causes this check can actually speak to. "hail" is the demo case.
-PRECIPITATION_CAUSES = {"hail", "rain", "storm", "flood", "snow", "lightning", "thunder"}
+PRECIPITATION_CAUSES = {
+    "hail", "rain", "storm", "flood", "snow", "lightning", "thunder",
+    # Must stay in step with the dispatcher's WEATHER_TRIGGER_CAUSES. A
+    # claimant blaming "severe weather" is making exactly the kind of
+    # assertion the archive can settle — declining it here meant the
+    # dispatcher fired the lookup and this function refused it.
+    "weather",
+}
 
 
 def _unresolved(claimed: str, reason: str) -> EvidenceResult:
