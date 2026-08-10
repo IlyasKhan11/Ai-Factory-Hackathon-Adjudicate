@@ -30,7 +30,13 @@ from app.verification import weather_client as weather
 
 logger = logging.getLogger("adjudicate")
 
-WEATHER_TRIGGER_CAUSES = {"hail", "flood", "storm", "wind", "lightning", "snow", "rain"}
+WEATHER_TRIGGER_CAUSES = {
+    "hail", "flood", "storm", "wind", "lightning", "snow", "rain",
+    # Claimants rarely name a precipitation type — "bad weather" and "severe
+    # weather" are how a delay or damage claim actually gets phrased, and
+    # they are just as checkable against the record.
+    "weather",
+}
 INCIDENT_TRIGGER_CAUSES = {"collision", "theft", "accident", "vandalism", "break-in", "burglary"}
 
 # Both markers contain "[STUB]" on purpose — the Judge prompt keys on that
