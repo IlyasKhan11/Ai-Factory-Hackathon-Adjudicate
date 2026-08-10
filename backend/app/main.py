@@ -29,7 +29,10 @@ import logging
 import time
 import uuid
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -67,6 +70,19 @@ async def _db(fn, *args):
     except Exception:
         logger.exception("supabase call %s failed", getattr(fn, "__name__", fn))
         return None
+
+
+# The demo call audio, served from here so the frontend can stream it over
+# the intake WebSocket without needing its own asset hosting. 16kHz mono
+# PCM16 — the exact format Stage 1 expects.
+DEMO_CALL_WAV = Path(__file__).resolve().parent.parent / "call.wav"
+
+
+@app.get("/demo-call.wav")
+def demo_call():
+    if not DEMO_CALL_WAV.exists():
+        raise HTTPException(status_code=404, detail="demo call audio not bundled")
+    return FileResponse(DEMO_CALL_WAV, media_type="audio/wav")
 
 
 @app.get("/health")

@@ -5,4 +5,4 @@ __pycache__/
 *.pyc
 .git/
 .gitignore
-*.wav
+# *.wav — the demo call audio must ship in the image
